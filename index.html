@@ -3,7 +3,7 @@
   Identrologix Inc – AI Identity Intelligence for SailPoint
   Version: 3.4
   Date:    2026-11-22
-  v3.4:    Added company logo (header, footer, favicon). Contact form now shows a
+  v3.4:    Phone number now uses IP country (time zone as fallback). AdSense enabled (publisher ID and two ad slots set). Added company logo (header, footer, favicon). Contact form now shows a
            prefilled "email us instead" link if sending fails.
   v3.3:    Added two quiet, labelled ad slots (after Getting Started and before the FAQ).
            They stay hidden until a Google AdSense publisher ID and slot IDs are entered in
@@ -813,7 +813,7 @@
   document.getElementById('year').textContent = new Date().getFullYear();
 
   // Show the Canadian phone number to visitors in Canada; everyone else sees the US number.
-  // Location is inferred from the browser's time zone (no third-party lookup, no cookies).
+  // Location: time-zone guess first, then refined by IP country (third-party lookup; mention it in your privacy policy).
   const PHONES = {
     US: { display: '732-882-9500', tel: '+17328829500', label: 'Call us (US)' },
     CA: { display: '647-498-9225', tel: '+16474989225', label: 'Call us (Canada)' }
@@ -833,10 +833,45 @@
     } catch (e) { /* fall through to default */ }
     return 'US';
   }
-  const phone = PHONES[detectCountry()];
-  document.querySelectorAll('.js-phone').forEach(a => a.setAttribute('href', 'tel:' + phone.tel));
-  document.querySelectorAll('.js-phone-number').forEach(el => el.textContent = phone.display);
-  document.querySelectorAll('.js-phone-label').forEach(el => el.textContent = phone.label);
+  function applyPhone(code) {
+    const phone = PHONES[code] || PHONES.US;
+    document.querySelectorAll('.js-phone').forEach(a => a.setAttribute('href', 'tel:' + phone.tel));
+    document.querySelectorAll('.js-phone-number').forEach(el => el.textContent = phone.display);
+    document.querySelectorAll('.js-phone-label').forEach(el => el.textContent = phone.label);
+  }
+
+  // IP-based country lookup (more reliable than the time zone, e.g. Windows reports Eastern Canada as America/New_York).
+  // Tries each free service in turn; returns a 2-letter country code or null if all fail.
+  async function lookupCountry() {
+    const sources = [
+      ['https://api.country.is/', d => d.country],
+      ['https://get.geojs.io/v1/ip/country.json', d => (Array.isArray(d) ? d[0] : d).country]
+    ];
+    for (const [url, pick] of sources) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 3000);
+        const res = await fetch(url, { signal: ctl.signal, cache: 'no-store' });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+        const c = String(pick(await res.json()) || '').toUpperCase();
+        if (/^[A-Z]{2}$/.test(c)) return c;
+      } catch (e) { /* try the next service */ }
+    }
+    return null;
+  }
+
+  // 1) Show a best guess immediately from the time zone, 2) then correct it using the visitor's IP country.
+  applyPhone(detectCountry());
+  (async () => {
+    let country = null;
+    try { country = sessionStorage.getItem('idx-country'); } catch (e) {}
+    if (!country) {
+      country = await lookupCountry();
+      if (country) { try { sessionStorage.setItem('idx-country', country); } catch (e) {} }
+    }
+    if (country) applyPhone(country === 'CA' ? 'CA' : 'US');
+  })();
 
   // Contact form: send the message to info@identrologixinc.com via FormSubmit (AJAX).
   const form = document.getElementById('contact-form');
@@ -883,7 +918,7 @@
   // Ads (Google AdSense). Slots stay hidden until you fill in the IDs below.
   // 1) client: your publisher ID, e.g. 'ca-pub-1234567890123456'
   // 2) slots:  numeric ad unit IDs from AdSense > Ads > By ad unit (one per slot)
-  const ADS = { client: 'ca-pub-1234567890123456', slots: { a: '5150806087', b: '1730435829' } };
+  const ADS = { client: 'ca-pub-2744810971397209', slots: { a: '1730435829', b: '5150806087' } };
   (function initAds() {
     if (!/^ca-pub-\d+$/.test(ADS.client)) return;
     const bands = [...document.querySelectorAll('.ad-band')].filter(b => /^\d+$/.test(ADS.slots[b.dataset.adKey] || ''));

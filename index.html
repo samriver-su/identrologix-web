@@ -883,7 +883,7 @@
   // Ads (Google AdSense). Slots stay hidden until you fill in the IDs below.
   // 1) client: your publisher ID, e.g. 'ca-pub-1234567890123456'
   // 2) slots:  numeric ad unit IDs from AdSense > Ads > By ad unit (one per slot)
-  const ADS = { client: '', slots: { a: '', b: '' } };
+  const ADS = { client: 'ca-pub-1234567890123456', slots: { a: '5150806087', b: '1730435829' } };
   (function initAds() {
     if (!/^ca-pub-\d+$/.test(ADS.client)) return;
     const bands = [...document.querySelectorAll('.ad-band')].filter(b => /^\d+$/.test(ADS.slots[b.dataset.adKey] || ''));
